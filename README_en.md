@@ -1,6 +1,6 @@
 <div align="center">
   
-[![中文](https://img.shields.io/badge/中文-Chinese-green?style=flat-square)](README_zh.md)
+[![中文](https://img.shields.io/badge/中文-Chinese-green?style=flat-square)](README.md)
   
 </div>
 
@@ -67,6 +67,6 @@
 
 <div align="center">
   
-[![中文](https://img.shields.io/badge/中文-Chinese-green?style=flat-square)](README_zh.md)
+[![中文](https://img.shields.io/badge/中文-Chinese-green?style=flat-square)](README.md)
   
 </div>
