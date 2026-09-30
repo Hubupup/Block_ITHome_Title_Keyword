@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IT之家 综合优化（关键词屏蔽+去红包广告+用户黑名单）
 // @namespace    https://github.com/Hubupup/Block_ITHome_Title_Keyword/
-// @version      3.0
+// @version      3.1
 // @description  屏蔽指定关键词新闻，移除轮播图（不影响自动播放），关闭底部横幅，隐藏打开APP图标，移除红包iframe
 // @author       Hubupup
 // @match        https://m.ithome.com/*
@@ -47,12 +47,34 @@
     // ==================== 用户黑名单配置 ====================
     const BLACKLIST_STORAGE_KEY = 'ithome_user_blacklist';
 
+    function normalizeBlacklistItem(item) {
+        if (!item) return null;
+        if (typeof item === 'string') {
+            const name = item.trim();
+            return name ? [name, '', ''] : null;
+        }
+        if (Array.isArray(item)) {
+            const name = String(item[0] || '').trim();
+            const id = String(item[1] || '').trim();
+            const href = String(item[2] || '').trim();
+            return (name || id) ? [name, id, href] : null;
+        }
+        if (typeof item === 'object') {
+            const name = String(item['user-name'] || item.username || item.name || '').trim();
+            const id = String(item['软媒通行证数字ID'] || item.userId || item.id || '').trim();
+            const href = String(item.href || item.url || '').trim();
+            return (name || id) ? [name, id, href] : null;
+        }
+        return null;
+    }
+
     function getBlacklist() {
         try {
             const data = localStorage.getItem(BLACKLIST_STORAGE_KEY);
             if (!data) return [];
             const parsed = JSON.parse(data);
-            return Array.isArray(parsed) ? parsed : [];
+            if (!Array.isArray(parsed)) return [];
+            return parsed.map(normalizeBlacklistItem).filter(Boolean);
         } catch (e) {
             return [];
         }
@@ -62,23 +84,43 @@
         localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify(list));
     }
 
-    function addToBlacklist(username) {
+    function addToBlacklist(username, userId, href) {
         const list = getBlacklist();
-        if (!list.includes(username)) {
-            list.push(username);
+        let exists = false;
+        if (userId) {
+            exists = list.some(item => item[1] === userId);
+        } else if (username) {
+            exists = list.some(item => item[0] === username);
+        }
+        if (!exists) {
+            list.push([username || '', userId || '', href || '']);
             saveBlacklist(list);
-            console.log('[屏蔽] 已加入黑名单:', username);
+            console.log('[屏蔽] 已加入黑名单:', username, 'ID:', userId, 'href:', href);
         }
     }
 
-    function removeFromBlacklist(username) {
-        const list = getBlacklist().filter(u => u !== username);
+    function removeFromBlacklist(target) {
+        const targetId = typeof target === 'object' ? target.userId : target;
+        const targetName = typeof target === 'object' ? target.username : target;
+
+        const list = getBlacklist().filter(item => {
+            if (targetId && item[1] === targetId) return false;
+            if (targetName && item[0] === targetName) return false;
+            return true;
+        });
         saveBlacklist(list);
-        console.log('[屏蔽] 已从黑名单移除:', username);
+        console.log('[屏蔽] 已从黑名单移除:', targetName || targetId);
     }
 
-    function isBlacklisted(username) {
-        return getBlacklist().includes(username);
+    function isBlacklisted(info) {
+        const list = getBlacklist();
+        if (typeof info === 'string') {
+            return list.some(item => (item[1] && item[1] === info) || item[0] === info);
+        }
+        if (info && info.userId) {
+            return list.some(item => item[1] === info.userId);
+        }
+        return false;
     }
 
     function exportBlacklist() {
@@ -107,9 +149,43 @@
                     const imported = JSON.parse(ev.target.result);
                     if (Array.isArray(imported)) {
                         const current = getBlacklist();
-                        const merged = [...new Set([...current, ...imported])];
+                        const normalizedImported = imported.map(normalizeBlacklistItem).filter(Boolean);
+
+                        const mergedMap = new Map();
+                        current.forEach(item => {
+                            const key = item[1] ? `id_${item[1]}` : `name_${item[0]}`;
+                            mergedMap.set(key, item);
+                        });
+
+                        let addedCount = 0;
+                        normalizedImported.forEach(item => {
+                            const idKey = item[1] ? `id_${item[1]}` : null;
+                            const nameKey = item[0] ? `name_${item[0]}` : null;
+
+                            if (idKey && mergedMap.has(idKey)) {
+                                const exist = mergedMap.get(idKey);
+                                if (!exist[0] && item[0]) exist[0] = item[0];
+                                if (!exist[2] && item[2]) exist[2] = item[2];
+                            } else if (nameKey && mergedMap.has(nameKey)) {
+                                const exist = mergedMap.get(nameKey);
+                                if (item[1]) {
+                                    mergedMap.delete(nameKey);
+                                    exist[1] = item[1];
+                                    if (item[2]) exist[2] = item[2];
+                                    mergedMap.set(`id_${item[1]}`, exist);
+                                }
+                            } else {
+                                const newKey = idKey || nameKey;
+                                if (newKey) {
+                                    mergedMap.set(newKey, item);
+                                    addedCount++;
+                                }
+                            }
+                        });
+
+                        const merged = Array.from(mergedMap.values());
                         saveBlacklist(merged);
-                        alert(`黑名单导入成功！新增 ${merged.length - current.length} 个用户，共 ${merged.length} 个用户。`);
+                        alert(`黑名单导入成功！新增 ${addedCount} 个用户，共 ${merged.length} 个用户。`);
                         console.log('[屏蔽] 黑名单已导入，共', merged.length, '个用户');
                         // 重新扫描并屏蔽已导入的黑名单用户评论
                         applyBlacklistToComments(document.body);
@@ -318,18 +394,133 @@
     }
 
     // ==================== 用户黑名单屏蔽 ====================
-    function addBlockButton(nameEl) {
+    function getUserInfo(nameEl) {
+        if (!nameEl) return { username: '', userId: '', href: '' };
+        const username = nameEl.innerText ? nameEl.innerText.trim() : '';
+        let linkEl = nameEl.closest('a') || nameEl.parentElement?.closest('a') || (nameEl.tagName === 'A' ? nameEl : null);
+
+        let href = '';
+        let title = '';
+
+        if (linkEl) {
+            href = linkEl.getAttribute('href') || linkEl.href || '';
+            title = linkEl.getAttribute('title') || linkEl.title || '';
+        }
+
+        // 如果当前链接无 title，尝试从同一评论项中提取头像或用户信息链接的 title
+        if (!title) {
+            const li = nameEl.closest('li');
+            if (li) {
+                const anyUserLink = li.querySelector('a[title*="数字ID"]') || li.querySelector('a[title*="通行证"]');
+                if (anyUserLink) {
+                    title = anyUserLink.getAttribute('title') || anyUserLink.title || '';
+                    if (!href) href = anyUserLink.getAttribute('href') || anyUserLink.href || '';
+                }
+            }
+        }
+
+        let userId = '';
+        if (title) {
+            const m = title.match(/(?:数字ID[：:]\s*)(\d+)/i) || title.match(/\d+/);
+            if (m) {
+                userId = m[1] || m[0] || '';
+            }
+        }
+
+        return { username, userId, href };
+    }
+
+    function checkAndUpdateBlacklist(info) {
+        if (!info) return false;
+        const list = getBlacklist();
+        let updated = false;
+        let isBlocked = false;
+
+        // 1. 根据软媒通行证数字ID进行屏蔽（不再根据用户名屏蔽）
+        if (info.userId) {
+            if (list.some(item => item[1] === info.userId)) {
+                isBlocked = true;
+            }
+        }
+
+        // 2. 兼容旧黑名单：对比原本已拉黑但没保存过用户id和href的用户(只保存了用户名user-name)，
+        //    遇到相同名字，更新黑名单，为其添加用户id和href
+        if (info.username && info.userId) {
+            for (let i = 0; i < list.length; i++) {
+                const item = list[i];
+                if (item[0] === info.username && !item[1]) {
+                    item[1] = info.userId;
+                    item[2] = info.href || item[2] || '';
+                    updated = true;
+                    isBlocked = true;
+                    console.log(`[屏蔽] 兼容旧黑名单：已为用户 "${info.username}" 补全通行证ID (${info.userId}) 和链接`);
+                }
+            }
+        }
+
+        if (updated) {
+            saveBlacklist(list);
+        }
+
+        return isBlocked;
+    }
+
+    function hideUserComments(info) {
+        document.querySelectorAll('.user-name').forEach(el => {
+            const otherInfo = getUserInfo(el);
+            const matchId = info.userId && otherInfo.userId === info.userId;
+            const matchName = !info.userId && info.username && otherInfo.username === info.username;
+            if (matchId || matchName) {
+                const btn = el.parentNode?.querySelector('.block-user-btn');
+                if (btn) {
+                    btn.textContent = '已屏蔽';
+                    btn.style.background = '#999';
+                }
+                const li = el.closest('li');
+                if (li && !li.dataset.userBlacklisted) {
+                    li.dataset.userBlacklisted = 'true';
+                    li.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    function restoreUserComments(target) {
+        const targetId = typeof target === 'object' ? target.userId : target;
+        const targetName = typeof target === 'object' ? target.username : target;
+        document.querySelectorAll('.user-name').forEach(el => {
+            const otherInfo = getUserInfo(el);
+            const matchId = targetId && otherInfo.userId === targetId;
+            const matchName = targetName && otherInfo.username === targetName;
+            if (matchId || matchName) {
+                const btn = el.parentNode?.querySelector('.block-user-btn');
+                if (btn) {
+                    btn.textContent = '屏蔽';
+                    btn.style.background = '#d22222';
+                }
+                const li = el.closest('li');
+                if (li && li.dataset.userBlacklisted) {
+                    delete li.dataset.userBlacklisted;
+                    li.style.display = '';
+                }
+            }
+        });
+    }
+
+    function addBlockButton(nameEl, info) {
         if (nameEl.dataset.blockBtnAdded) return;
         nameEl.dataset.blockBtnAdded = 'true';
 
-        const username = nameEl.innerText.trim();
-        if (!username) return;
+        if (!info) info = getUserInfo(nameEl);
+        if (!info.username && !info.userId) return;
+
+        const isBlocked = checkAndUpdateBlacklist(info);
 
         const btn = document.createElement('span');
         btn.className = 'block-user-btn';
         btn.style.cssText = 'display:inline-block;margin-left:6px;padding:1px 6px;font-size:10px;color:#fff;background:#d22222;border-radius:3px;cursor:pointer;vertical-align:middle;line-height:1.6;user-select:none;';
 
-        if (isBlacklisted(username)) {
+        if (isBlocked) {
             btn.textContent = '已屏蔽';
             btn.style.background = '#999';
         } else {
@@ -339,38 +530,20 @@
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const uname = nameEl.innerText.trim();
-            if (isBlacklisted(uname)) {
-                if (confirm(`确定将 "${uname}" 从黑名单移除吗？`)) {
-                    removeFromBlacklist(uname);
-                    btn.textContent = '屏蔽';
-                    btn.style.background = '#d22222';
-                    // 恢复该用户评论显示
-                    document.querySelectorAll('.user-name').forEach(el => {
-                        if (el.innerText.trim() === uname) {
-                            const li = el.closest('li');
-                            if (li && li.dataset.userBlacklisted) {
-                                delete li.dataset.userBlacklisted;
-                                li.style.display = '';
-                            }
-                        }
-                    });
+            const currentInfo = getUserInfo(nameEl);
+            const currentlyBlocked = isBlacklisted(currentInfo);
+
+            if (currentlyBlocked) {
+                const label = currentInfo.userId ? `"${currentInfo.username}" (ID: ${currentInfo.userId})` : `"${currentInfo.username}"`;
+                if (confirm(`确定将 ${label} 从黑名单移除吗？`)) {
+                    removeFromBlacklist(currentInfo);
+                    restoreUserComments(currentInfo);
                 }
             } else {
-                if (confirm(`确定将 "${uname}" 加入黑名单吗？该用户的所有评论将被隐藏。`)) {
-                    addToBlacklist(uname);
-                    btn.textContent = '已屏蔽';
-                    btn.style.background = '#999';
-                    // 立即屏蔽该用户所有已加载评论
-                    document.querySelectorAll('.user-name').forEach(el => {
-                        if (el.innerText.trim() === uname) {
-                            const li = el.closest('li');
-                            if (li) {
-                                li.dataset.userBlacklisted = 'true';
-                                li.style.display = 'none';
-                            }
-                        }
-                    });
+                const label = currentInfo.userId ? `"${currentInfo.username}" (ID: ${currentInfo.userId})` : `"${currentInfo.username}"`;
+                if (confirm(`确定将 ${label} 加入黑名单吗？该用户的所有评论将被隐藏。`)) {
+                    addToBlacklist(currentInfo.username, currentInfo.userId, currentInfo.href);
+                    hideUserComments(currentInfo);
                 }
             }
         });
@@ -378,22 +551,24 @@
         nameEl.parentNode.insertBefore(btn, nameEl.nextSibling);
     }
 
-    function blockBlacklistedUserComment(nameEl) {
-        const username = nameEl.innerText.trim();
-        if (!username || !isBlacklisted(username)) return;
+    function blockBlacklistedUserComment(nameEl, info) {
+        if (!info) info = getUserInfo(nameEl);
+        const isBlocked = checkAndUpdateBlacklist(info);
+        if (!isBlocked) return;
         const li = nameEl.closest('li');
         if (li && !li.dataset.userBlacklisted) {
             li.dataset.userBlacklisted = 'true';
             li.style.display = 'none';
-            console.log('[屏蔽] 黑名单用户评论已隐藏:', username);
+            console.log(`[屏蔽] 黑名单用户评论已隐藏: ${info.username} (ID: ${info.userId || '无'})`);
         }
     }
 
     function applyBlacklistToComments(root) {
         const nameEls = root.querySelectorAll ? root.querySelectorAll('.user-name') : [];
         nameEls.forEach(el => {
-            addBlockButton(el);
-            blockBlacklistedUserComment(el);
+            const info = getUserInfo(el);
+            addBlockButton(el, info);
+            blockBlacklistedUserComment(el, info);
         });
     }
 
@@ -440,15 +615,20 @@
                 alert('黑名单为空');
                 return;
             }
-            const names = list.join('\n');
-            const toRemove = prompt(`当前黑名单用户（${list.length}人）：\n${names}\n\n输入要移除的用户名（多个用逗号分隔），或点击取消关闭：`);
+            const displayList = list.map(item => {
+                const name = item[0] || '未知用户';
+                const id = item[1] ? `ID: ${item[1]}` : '待匹配ID';
+                return `${name} (${id})`;
+            }).join('\n');
+            const toRemove = prompt(`当前黑名单用户（${list.length}人）：\n${displayList}\n\n输入要移除的用户通行证ID或用户名（多个用逗号分隔），或点击取消关闭：`);
             if (toRemove !== null && toRemove.trim()) {
-                const removeNames = toRemove.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-                removeNames.forEach(name => removeFromBlacklist(name));
+                const removeItems = toRemove.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+                removeItems.forEach(target => {
+                    removeFromBlacklist(target);
+                    restoreUserComments(target);
+                });
                 listCount.textContent = `黑名单: ${getBlacklist().length} 人`;
-                alert('已移除: ' + removeNames.join(', '));
-                // 恢复被移除用户的评论
-                applyBlacklistToComments(document.body);
+                alert('已移除: ' + removeItems.join(', '));
             }
         };
 
@@ -635,7 +815,7 @@
 
     // ==================== 初始化 ====================
     function init() {
-        console.log('[屏蔽] 脚本启动 v3.0');
+        console.log('[屏蔽] 脚本启动 v3.1');
         document.querySelectorAll('.plc-title').forEach(blockList);
         document.querySelectorAll('.slide-title').forEach(blockBanner);
         autoCloseBanner();
