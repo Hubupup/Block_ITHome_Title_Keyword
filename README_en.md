@@ -16,6 +16,7 @@
 <li>📵 <strong>Auto Close Bottom Banner</strong>: Simulates a click on the "Open App" bottom banner to close it automatically.</li>
 <li>👻 <strong>Hide "Open App" Icon</strong>: Permanently hides the floating "Open in App" button at the bottom-right corner.</li>
 <li>🧧 <strong>Remove Red Packet Popup</strong>: Detects and deletes the iframe used for 618/Double 11 promotional popups.</li>
+<li>🖼️ <strong>Comment Image Auto-Display</strong>: Automatically displays images in comments without login, supports smart grid layout for multiple images, and click to view full-size images in a new tab.</li>
 <li>👎 <strong>Low-Quality Comment Blocking</strong>: Auto-hides comments with high downvote/upvote ratio, with configurable thresholds.</li>
 <li>🚫 <strong>User Blacklist</strong>: A "Block" button appears next to each username in comments — one click to blacklist a user and hide all their comments.</li>
 <li>📥📤 <strong>Blacklist Import/Export</strong>: Export blacklist as a JSON file for backup; import with automatic merge, deduplication, and legacy format compatibility.</li>
@@ -34,6 +35,18 @@
 <td><img src="ITHome_After.png" alt="After"></td>
 </tr>
 </table>
+
+<table>
+<tr>
+<th>Picture_Show_Before</th>
+<th>Picture_Show_After</th>
+</tr>
+<tr>
+<td><img src="ITHome_ShowPicture_Before.png" alt="Picture_Show_Before"></td>
+<td><img src="ITHome_ShowPicture_After.png" alt="Picture_Show_After"></td>
+</tr>
+<table>
+
 <table>
 <tr>
 <th>Dashboard & block button</th>
