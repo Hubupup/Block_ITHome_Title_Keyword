@@ -16,6 +16,7 @@
 <li>📵 <strong>底部横幅自动关闭</strong>：自动点击并关闭"打开APP"底部横幅。</li>
 <li>👻 <strong>隐藏"打开APP"图标</strong>：移除右下角悬浮的"打开APP"按钮。</li>
 <li>🧧 <strong>红包弹窗移除</strong>：自动删除618/双11等促销红包iframe，彻底告别弹窗。</li>
+<li>🖼️ <strong>评论图片自动展示</strong>：免登录自动解析并显示评论区图片，多图智能网格排版，点击图片在新标签页查看原始大图。</li>
 <li>👎 <strong>低质评论屏蔽</strong>：根据支持/反对比例自动隐藏高反对低支持的低质评论，阈值可配置。</li>
 <li>🚫 <strong>用户黑名单</strong>：评论用户名旁显示"屏蔽"按钮，一键拉黑，该用户所有评论自动隐藏。</li>
 <li>📥📤 <strong>黑名单导入/导出</strong>：支持导出为 JSON 文件备份，导入时自动合并去重并兼容旧版黑名单格式。</li>
@@ -32,6 +33,16 @@
 <tr>
 <td><img src="ITHome_Before.png" alt="屏蔽前"></td>
 <td><img src="ITHome_After.png" alt="屏蔽后"></td>
+</tr>
+<table>
+<table>
+<tr>
+<th>照片显示前</th>
+<th>照片显示后</th>
+</tr>
+<tr>
+<td><img src="ITHome_ShowPicture_Before.png" alt="照片显示前"></td>
+<td><img src="ITHome_ShowPicture_After.png" alt="照片显示后"></td>
 </tr>
 <table>
 <tr>
