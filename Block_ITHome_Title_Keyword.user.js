@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         IT之家 综合优化（关键词屏蔽+去红包广告+用户黑名单）
+// @name:en      ITome block keyword + moveout fuck AD + userblacklist
 // @namespace    https://github.com/Hubupup/Block_ITHome_Title_Keyword/
 // @version      3.2
 // @description  屏蔽指定关键词新闻，移除轮播图（不影响自动播放），关闭底部横幅，隐藏打开APP图标，移除红包iframe
+// @description:en block keyword + moveout fuck AD + userblacklist
 // @author       Hubupup
 // @match        https://m.ithome.com/*
 // @grant        none
