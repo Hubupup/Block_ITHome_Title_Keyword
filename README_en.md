@@ -18,7 +18,7 @@
 <li>🧧 <strong>Remove Red Packet Popup</strong>: Detects and deletes the iframe used for 618/Double 11 promotional popups.</li>
 <li>👎 <strong>Low-Quality Comment Blocking</strong>: Auto-hides comments with high downvote/upvote ratio, with configurable thresholds.</li>
 <li>🚫 <strong>User Blacklist</strong>: A "Block" button appears next to each username in comments — one click to blacklist a user and hide all their comments.</li>
-<li>📥📤 <strong>Blacklist Import/Export</strong>: Export blacklist as a JSON file for backup; import with automatic merge and deduplication.</li>
+<li>📥📤 <strong>Blacklist Import/Export</strong>: Export blacklist as a JSON file for backup; import with automatic merge, deduplication, and legacy format compatibility.</li>
 <li>⚙️ <strong>Visual Config Panel</strong>: A management button at the bottom-right corner lets you edit keywords and comment blocking thresholds directly on the page — no code editing needed.</li>
 <li>🌐 <strong>Site-wide Coverage</strong>: Works on all subpages of <code>m.ithome.com</code> (homepage, hot list, category pages, etc.).</li>
 </ul>
@@ -75,10 +75,10 @@ target="_blank">Script Cat</a></li>
 
 <h3>User Blacklist</h3>
 <ul>
-<li>A red <strong>"Block" button</strong> appears next to each username in comments — click to add the user to the blacklist</li>
-<li>Blocked users show a grey <strong>"Blocked" button</strong> — click again to remove from blacklist</li>
-<li>Blacklist supports <strong>export</strong> to JSON file and <strong>import</strong> (auto-merge with deduplication)</li>
-<li>Use <strong>"View Blacklist"</strong> in the panel to see all blacklisted users and batch-remove them</li>
+<li>A red <strong>"Block" button</strong> appears next to each username in comments — click to add the user to the blacklist and hide all their comments</li>
+<li><strong>Seamless legacy compatibility</strong></li>
+<li>Blacklist supports <strong>exporting</strong> to JSON file for backup and <strong>importing</strong> (smart deduplication, merge, and auto-completion)</li>
+<li>Use <strong>"View Blacklist"</strong> in the bottom-right panel to check all blacklisted entries, and remove them quickly via ID or username</li>
 </ul>
 
 <h3>Manual Config Editing (Optional)</h3>
