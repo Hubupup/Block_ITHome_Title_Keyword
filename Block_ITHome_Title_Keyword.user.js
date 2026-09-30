@@ -1,10 +1,8 @@
 // ==UserScript==
 // @name         IT之家 综合优化（关键词屏蔽+去红包广告+用户黑名单）
-// @name:en      ITome block keyword + moveout fuck AD + userblacklist
 // @namespace    https://github.com/Hubupup/Block_ITHome_Title_Keyword/
-// @version      3.1
+// @version      3.2
 // @description  屏蔽指定关键词新闻，移除轮播图（不影响自动播放），关闭底部横幅，隐藏打开APP图标，移除红包iframe
-// @description:en block keyword + moveout fuck AD + userblacklist
 // @author       Hubupup
 // @match        https://m.ithome.com/*
 // @grant        none
@@ -574,6 +572,140 @@
         });
     }
 
+    // ==================== 黑名单管理弹窗 ====================
+    function openBlacklistModal() {
+        const existing = document.getElementById('ithome-blacklist-modal-mask');
+        if (existing) existing.remove();
+
+        const mask = document.createElement('div');
+        mask.id = 'ithome-blacklist-modal-mask';
+        mask.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+
+        const card = document.createElement('div');
+        card.style.cssText = 'background:#fff;border-radius:10px;width:100%;max-width:380px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,0.25);overflow:hidden;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+
+        // 头部 Header
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #eee;';
+        const title = document.createElement('div');
+        title.style.cssText = 'font-size:15px;font-weight:600;color:#333;';
+        const closeBtn = document.createElement('div');
+        closeBtn.style.cssText = 'font-size:20px;color:#999;cursor:pointer;line-height:1;padding:0 4px;user-select:none;';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.onclick = () => mask.remove();
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+
+        // 列表 List（可独立滚动）
+        const listContainer = document.createElement('div');
+        listContainer.style.cssText = 'flex:1;overflow-y:auto;padding:8px 16px;max-height:48vh;-webkit-overflow-scrolling:touch;';
+
+        function renderList() {
+            const list = getBlacklist();
+            title.textContent = `黑名单列表 (${list.length}人)`;
+
+            // 同步更新管理菜单中的总数
+            const listCount = document.querySelector('#blacklist-menu > div:first-child');
+            if (listCount) {
+                listCount.textContent = `黑名单: ${list.length} 人`;
+            }
+
+            listContainer.innerHTML = '';
+            if (list.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'text-align:center;color:#999;font-size:13px;padding:30px 0;';
+                empty.textContent = '暂无黑名单用户';
+                listContainer.appendChild(empty);
+                return;
+            }
+
+            list.forEach(item => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f2f2f2;gap:8px;';
+
+                const infoDiv = document.createElement('div');
+                infoDiv.style.cssText = 'display:flex;flex-direction:column;overflow:hidden;flex:1;';
+
+                const nameSpan = document.createElement('div');
+                nameSpan.style.cssText = 'font-size:13px;font-weight:500;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+                nameSpan.textContent = item[0] || '未知用户名';
+
+                const idSpan = document.createElement('div');
+                idSpan.style.cssText = 'font-size:11px;color:#888;margin-top:2px;';
+                idSpan.textContent = item[1] ? `ID: ${item[1]}` : '待匹配通行证ID';
+
+                infoDiv.appendChild(nameSpan);
+                infoDiv.appendChild(idSpan);
+
+                const delBtn = document.createElement('button');
+                delBtn.style.cssText = 'padding:3px 10px;font-size:11px;color:#d22222;background:#fff;border:1px solid #d22222;border-radius:4px;cursor:pointer;flex-shrink:0;';
+                delBtn.textContent = '移除';
+                delBtn.onclick = () => {
+                    const target = item[1] || item[0];
+                    removeFromBlacklist(target);
+                    restoreUserComments(target);
+                    renderList();
+                };
+
+                row.appendChild(infoDiv);
+                row.appendChild(delBtn);
+                listContainer.appendChild(row);
+            });
+        }
+
+        renderList();
+
+        // 底部 Footer（批量输入与关闭）
+        const footer = document.createElement('div');
+        footer.style.cssText = 'padding:12px 16px;border-top:1px solid #eee;background:#fafafa;display:flex;flex-direction:column;gap:8px;';
+
+        const inputRow = document.createElement('div');
+        inputRow.style.cssText = 'display:flex;gap:6px;align-items:center;';
+
+        const batchInput = document.createElement('input');
+        batchInput.type = 'text';
+        batchInput.placeholder = '输入ID或用户名(逗号分隔)';
+        batchInput.style.cssText = 'flex:1;min-width:0;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:4px;outline:none;box-sizing:border-box;';
+
+        const batchBtn = document.createElement('button');
+        batchBtn.textContent = '批量移除';
+        batchBtn.style.cssText = 'padding:6px 12px;font-size:12px;color:#fff;background:#d22222;border:none;border-radius:4px;cursor:pointer;white-space:nowrap;flex-shrink:0;';
+        batchBtn.onclick = () => {
+            const val = batchInput.value.trim();
+            if (!val) return;
+            const removeItems = val.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+            if (removeItems.length === 0) return;
+            removeItems.forEach(target => {
+                removeFromBlacklist(target);
+                restoreUserComments(target);
+            });
+            batchInput.value = '';
+            renderList();
+        };
+
+        inputRow.appendChild(batchInput);
+        inputRow.appendChild(batchBtn);
+
+        const closeCardBtn = document.createElement('button');
+        closeCardBtn.textContent = '关闭';
+        closeCardBtn.style.cssText = 'width:100%;padding:7px;font-size:12px;color:#666;background:#fff;border:1px solid #ddd;border-radius:4px;cursor:pointer;';
+        closeCardBtn.onclick = () => mask.remove();
+
+        footer.appendChild(inputRow);
+        footer.appendChild(closeCardBtn);
+
+        card.appendChild(header);
+        card.appendChild(listContainer);
+        card.appendChild(footer);
+        mask.appendChild(card);
+
+        mask.onclick = (e) => {
+            if (e.target === mask) mask.remove();
+        };
+
+        document.body.appendChild(mask);
+    }
+
     // ==================== 黑名单管理面板 ====================
     function createBlacklistPanel() {
         if (document.getElementById('blacklist-panel')) return;
@@ -612,26 +744,7 @@
         viewBtn.textContent = '查看黑名单';
         viewBtn.onclick = (e) => {
             e.stopPropagation();
-            const list = getBlacklist();
-            if (list.length === 0) {
-                alert('黑名单为空');
-                return;
-            }
-            const displayList = list.map(item => {
-                const name = item[0] || '未知用户';
-                const id = item[1] ? `ID: ${item[1]}` : '待匹配ID';
-                return `${name} (${id})`;
-            }).join('\n');
-            const toRemove = prompt(`当前黑名单用户（${list.length}人）：\n${displayList}\n\n输入要移除的用户通行证ID或用户名（多个用逗号分隔），或点击取消关闭：`);
-            if (toRemove !== null && toRemove.trim()) {
-                const removeItems = toRemove.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-                removeItems.forEach(target => {
-                    removeFromBlacklist(target);
-                    restoreUserComments(target);
-                });
-                listCount.textContent = `黑名单: ${getBlacklist().length} 人`;
-                alert('已移除: ' + removeItems.join(', '));
-            }
+            openBlacklistModal();
         };
 
         menu.appendChild(listCount);
