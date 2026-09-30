@@ -18,7 +18,7 @@
 <li>🧧 <strong>红包弹窗移除</strong>：自动删除618/双11等促销红包iframe，彻底告别弹窗。</li>
 <li>👎 <strong>低质评论屏蔽</strong>：根据支持/反对比例自动隐藏高反对低支持的低质评论，阈值可配置。</li>
 <li>🚫 <strong>用户黑名单</strong>：评论用户名旁显示"屏蔽"按钮，一键拉黑，该用户所有评论自动隐藏。</li>
-<li>📥📤 <strong>黑名单导入/导出</strong>：支持导出为 JSON 文件备份，导入时自动合并去重。</li>
+<li>📥📤 <strong>黑名单导入/导出</strong>：支持导出为 JSON 文件备份，导入时自动合并去重并兼容旧版黑名单格式。</li>
 <li>⚙️ <strong>可视化配置面板</strong>：右下角管理按钮，可直接在页面内修改屏蔽关键词、评论屏蔽阈值，无需编辑代码。</li>
 <li>🌐 <strong>全站覆盖</strong>：支持首页、热榜、分类等所有移动端子页面 (<code>m.ithome.com/*</code>)。</li>
 </ul>
@@ -75,10 +75,10 @@ target="_blank">Script Cat</a></li>
 
 <h3>用户黑名单</h3>
 <ul>
-<li>评论区的用户名旁会显示红色的<strong>「屏蔽」</strong>按钮，点击即可将用户加入黑名单</li>
-<li>已屏蔽用户按钮显示为灰色<strong>「已屏蔽」</strong>，再次点击可移除</li>
-<li>黑名单支持<strong>导出</strong>为 JSON 文件和<strong>导入</strong>（自动合并去重）</li>
-<li>可在面板中<strong>查看黑名单</strong>并批量移除用户</li>
+<li>评论区的用户名旁会显示红色的<strong>「屏蔽」</strong>按钮，点击即可将该用户加入黑名单并自动隐藏其所有评论</li>
+<li><strong>旧版黑名单平滑兼容</strong></li>
+<li>黑名单支持<strong>导出</strong>为 JSON 文件备份以及<strong>导入</strong>（智能去重合并与补全）</li>
+<li>可在右下角面板中<strong>查看黑名单</strong>，支持输入用户通行证数字ID或用户名快捷移除</li>
 </ul>
 
 <h3>手动编辑配置（可选）</h3>
