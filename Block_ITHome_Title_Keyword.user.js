@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         IT之家 综合优化（关键词屏蔽+去红包广告+用户黑名单）
+// @name         IT之家 综合优化（关键词屏蔽+免登录显示大图+去红包广告+用户黑名单）
 // @name:en      ITome block keyword + moveout fuck AD + userblacklist
 // @namespace    https://github.com/Hubupup/Block_ITHome_Title_Keyword/
-// @version      3.2
-// @description  屏蔽指定关键词新闻，移除轮播图（不影响自动播放），关闭底部横幅，隐藏打开APP图标，移除红包iframe
-// @description:en block keyword + moveout fuck AD + userblacklist
+// @version      4.0
+// @description  屏蔽指定关键词新闻，评论区图片免登录自动显示与大图浏览，关闭底部横幅，隐藏打开APP图标，移除红包iframe，根据通行证ID屏蔽黑名单
+// @description:en Block keyword news, remove banner ads, auto-hide popups, blacklist users by ID, auto-display comment images without login
 // @author       Hubupup
 // @match        https://m.ithome.com/*
 // @grant        none
@@ -392,6 +392,109 @@
                     }
                 }
             });
+        });
+    }
+
+    // ==================== 评论区自动显示图片 ====================
+    function decodeBase64(str) {
+        if (!str) return '';
+        try {
+            return decodeURIComponent(escape(atob(str)));
+        } catch (e) {
+            try {
+                return atob(str);
+            } catch (err) {
+                return '';
+            }
+        }
+    }
+
+    function createCommentImageElement(imgUrl, totalImgs) {
+        const link = document.createElement('a');
+        link.className = 'cmt-img-preview-link';
+        link.href = imgUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.title = '点击新页面查看大图';
+
+        // 样式适配：单张图自适应限制最大宽高；多张图九宫格/四宫格
+        if (totalImgs === 1) {
+            link.style.cssText = 'display:inline-block;max-width:min(100%, 280px);max-height:280px;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.12);background:#f2f2f2;cursor:pointer;line-height:0;margin:4px 0;';
+        } else {
+            const is2Col = (totalImgs === 2 || totalImgs === 4);
+            const widthStyle = is2Col ? 'width:calc(50% - 4px);max-width:130px;' : 'width:calc(33.333% - 4px);max-width:95px;';
+            link.style.cssText = `display:inline-block;${widthStyle}aspect-ratio:1/1;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.12);background:#f2f2f2;cursor:pointer;flex-shrink:0;line-height:0;margin:1px 0;`;
+        }
+
+        const img = document.createElement('img');
+        img.src = imgUrl;
+        img.alt = '评论图片';
+        img.loading = 'lazy';
+        if (totalImgs === 1) {
+            img.style.cssText = 'display:block;max-width:100%;max-height:280px;width:auto;height:auto;object-fit:contain;border-radius:6px;';
+        } else {
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:6px;display:block;';
+        }
+
+        img.onerror = () => {
+            link.style.display = 'inline-flex';
+            link.style.alignItems = 'center';
+            link.style.justifyContent = 'center';
+            link.style.padding = '8px';
+            link.style.color = '#999';
+            link.style.fontSize = '11px';
+            link.textContent = '[图片加载失败，点击打开]';
+        };
+
+        link.onclick = (e) => {
+            e.stopPropagation();
+        };
+
+        link.appendChild(img);
+        return link;
+    }
+
+    function renderCommentImages(root) {
+        if (!root) return;
+
+        // 1. 处理 .post-img-list 容器中的图片组（主评论区与楼中楼）
+        const imgLists = root.querySelectorAll ? root.querySelectorAll('.post-img-list') : [];
+        imgLists.forEach(listEl => {
+            if (listEl.dataset.imagesRendered) return;
+            const placeholders = Array.from(listEl.querySelectorAll('.img-placeholder[data-s], [data-s]'));
+            if (placeholders.length === 0) return;
+
+            const total = placeholders.length;
+            listEl.style.display = 'flex';
+            listEl.style.flexWrap = 'wrap';
+            listEl.style.gap = '6px';
+            listEl.style.marginTop = '8px';
+            listEl.style.marginBottom = '6px';
+
+            placeholders.forEach(placeholder => {
+                const b64 = placeholder.getAttribute('data-s');
+                const imgUrl = decodeBase64(b64);
+                if (imgUrl) {
+                    const imgEl = createCommentImageElement(imgUrl, total);
+                    placeholder.dataset.imgRendered = 'true';
+                    placeholder.replaceWith(imgEl);
+                }
+            });
+
+            listEl.dataset.imagesRendered = 'true';
+        });
+
+        // 2. 兜底处理未在 .post-img-list 内的孤立 .img-placeholder
+        const standalone = root.querySelectorAll ? root.querySelectorAll('.img-placeholder[data-s]:not([data-img-rendered])') : [];
+        standalone.forEach(placeholder => {
+            if (placeholder.dataset.imgRendered) return;
+            const b64 = placeholder.getAttribute('data-s');
+            const imgUrl = decodeBase64(b64);
+            if (imgUrl) {
+                const imgEl = createCommentImageElement(imgUrl, 1);
+                placeholder.dataset.imgRendered = 'true';
+                placeholder.replaceWith(imgEl);
+            }
         });
     }
 
@@ -893,12 +996,16 @@
                     // 如果新增节点包含评论相关结构，扫描评论
                     if (node.classList?.contains('comment-item') ||
                         node.classList?.contains('comment-section') ||
+                        node.classList?.contains('post-img-list') ||
                         node.querySelector?.('.comment-item') ||
                         node.querySelector?.('.comment-vote') ||
                         node.querySelector?.('.user-name') ||
+                        node.querySelector?.('.post-img-list') ||
+                        node.querySelector?.('.img-placeholder') ||
                         node.tagName === 'LI') {
                         scanComments(node);
                         applyBlacklistToComments(node);
+                        renderCommentImages(node);
                     }
                 });
 
@@ -932,7 +1039,7 @@
 
     // ==================== 初始化 ====================
     function init() {
-        console.log('[屏蔽] 脚本启动 v3.1');
+        console.log('[屏蔽] 脚本启动');
         document.querySelectorAll('.plc-title').forEach(blockList);
         document.querySelectorAll('.slide-title').forEach(blockBanner);
         autoCloseBanner();
@@ -940,6 +1047,7 @@
         blockHongbaoIframe();
         scanComments(document.body); // 初始化时扫描已有评论
         applyBlacklistToComments(document.body); // 初始化时扫描黑名单用户
+        renderCommentImages(document.body); // 初始化时显示评论图片
         createBlacklistPanel(); // 创建黑名单管理面板
         observeDOM();
 
@@ -949,6 +1057,7 @@
             blockHongbaoIframe();
             scanComments(document.body); // 延迟再次扫描评论（应对懒加载）
             applyBlacklistToComments(document.body);
+            renderCommentImages(document.body);
         }, 1000);
 
         // 评论区通常是滚动加载，额外添加滚动监听
@@ -958,6 +1067,7 @@
             scrollTimer = setTimeout(() => {
                 scanComments(document.body);
                 applyBlacklistToComments(document.body);
+                renderCommentImages(document.body);
             }, 300);
         }, { passive: true });
     }
