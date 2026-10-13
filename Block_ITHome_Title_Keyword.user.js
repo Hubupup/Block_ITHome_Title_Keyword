@@ -2,7 +2,7 @@
 // @name         IT之家 综合优化（关键词屏蔽+免登录显示大图+去红包广告+用户黑名单）
 // @name:en      ITome block keyword + moveout fuck AD + userblacklist
 // @namespace    https://github.com/Hubupup/Block_ITHome_Title_Keyword/
-// @version      4.0
+// @version      4.1
 // @description  屏蔽指定关键词新闻，评论区图片免登录自动显示与大图浏览，关闭底部横幅，隐藏打开APP图标，移除红包iframe，根据通行证ID屏蔽黑名单
 // @description:en Block keyword news, remove banner ads, auto-hide popups, blacklist users by ID, auto-display comment images without login
 // @author       Hubupup
@@ -304,7 +304,7 @@
 
     // ==================== 屏蔽红包 iframe ====================
     function blockHongbaoIframe() {
-        const iframes = document.querySelectorAll('iframe[src*="hongbao.html"]');
+        const iframes = document.querySelectorAll('iframe[src*="hongbao"]');
         iframes.forEach(iframe => {
             if (!iframe.dataset.blocked) {
                 iframe.remove();
@@ -987,10 +987,10 @@
                     }
 
                     // 红包 iframe
-                    if (node.tagName === 'IFRAME' && node.src.includes('hongbao.html')) {
+                    if (node.tagName === 'IFRAME' && node.src.includes('hongbao')) {
                         blockHongbaoIframe();
                     }
-                    node.querySelectorAll?.('iframe[src*="hongbao.html"]').forEach(() => blockHongbaoIframe());
+                    node.querySelectorAll?.('iframe[src*="hongbao"]').forEach(() => blockHongbaoIframe());
 
                     // ===== 评论区动态加载检测 =====
                     // 如果新增节点包含评论相关结构，扫描评论
