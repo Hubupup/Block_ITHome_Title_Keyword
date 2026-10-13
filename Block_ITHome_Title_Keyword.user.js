@@ -2,7 +2,7 @@
 // @name         IT之家 综合优化（关键词屏蔽+免登录显示大图+去红包广告+用户黑名单）
 // @name:en      ITome block keyword + moveout fuck AD + userblacklist
 // @namespace    https://github.com/Hubupup/Block_ITHome_Title_Keyword/
-// @version      4.1
+// @version      4.2
 // @description  屏蔽指定关键词新闻，评论区图片免登录自动显示与大图浏览，关闭底部横幅，隐藏打开APP图标，移除红包iframe，根据通行证ID屏蔽黑名单
 // @description:en Block keyword news, remove banner ads, auto-hide popups, blacklist users by ID, auto-display comment images without login
 // @author       Hubupup
@@ -811,6 +811,120 @@
         document.body.appendChild(mask);
     }
 
+    // ==================== 关键词管理弹窗 ====================
+    function openKeywordModal() {
+        const existing = document.getElementById('ithome-keyword-modal-mask');
+        if (existing) existing.remove();
+
+        const mask = document.createElement('div');
+        mask.id = 'ithome-keyword-modal-mask';
+        mask.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+
+        const card = document.createElement('div');
+        card.style.cssText = 'background:#fff;border-radius:10px;width:100%;max-width:380px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,0.25);overflow:hidden;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #eee;';
+        const title = document.createElement('div');
+        title.style.cssText = 'font-size:15px;font-weight:600;color:#333;';
+        const closeBtn = document.createElement('div');
+        closeBtn.style.cssText = 'font-size:20px;color:#999;cursor:pointer;line-height:1;padding:0 4px;user-select:none;';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.onclick = () => mask.remove();
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+
+        const listContainer = document.createElement('div');
+        listContainer.style.cssText = 'flex:1;overflow-y:auto;padding:8px 16px;max-height:48vh;-webkit-overflow-scrolling:touch;';
+
+        function renderList() {
+            const keywords = getKeywords();
+            title.textContent = `屏蔽关键词 (${keywords.length})`;
+            listContainer.replaceChildren();
+
+            if (keywords.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'text-align:center;color:#999;font-size:13px;padding:30px 0;';
+                empty.textContent = '暂无屏蔽关键词';
+                listContainer.appendChild(empty);
+                return;
+            }
+
+            keywords.forEach(keyword => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f2f2f2;gap:8px;';
+
+                const keywordText = document.createElement('div');
+                keywordText.style.cssText = 'font-size:13px;font-weight:500;color:#333;overflow:hidden;text-overflow:ellipsis;';
+                keywordText.textContent = keyword;
+
+                const delBtn = document.createElement('button');
+                delBtn.style.cssText = 'padding:3px 10px;font-size:11px;color:#d22222;background:#fff;border:1px solid #d22222;border-radius:4px;cursor:pointer;flex-shrink:0;';
+                delBtn.textContent = '移除';
+                delBtn.onclick = () => {
+                    saveKeywords(getKeywords().filter(item => item !== keyword));
+                    renderList();
+                };
+
+                row.appendChild(keywordText);
+                row.appendChild(delBtn);
+                listContainer.appendChild(row);
+            });
+        }
+        renderList();
+
+        const footer = document.createElement('div');
+        footer.style.cssText = 'padding:12px 16px;border-top:1px solid #eee;background:#fafafa;display:flex;flex-direction:column;gap:8px;';
+
+        const inputRow = document.createElement('div');
+        inputRow.style.cssText = 'display:flex;gap:6px;align-items:center;';
+        const keywordInput = document.createElement('input');
+        keywordInput.type = 'text';
+        keywordInput.placeholder = '输入关键词';
+        keywordInput.style.cssText = 'flex:1;min-width:0;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:4px;outline:none;box-sizing:border-box;';
+
+        const addBtn = document.createElement('button');
+        addBtn.textContent = '添加';
+        addBtn.style.cssText = 'padding:6px 12px;font-size:12px;color:#fff;background:#4a90d9;border:none;border-radius:4px;cursor:pointer;white-space:nowrap;flex-shrink:0;';
+        addBtn.onclick = () => {
+            const keyword = keywordInput.value.trim();
+            if (!keyword) return;
+            const keywords = getKeywords();
+            if (keywords.includes(keyword)) {
+                alert('该关键词已存在');
+                return;
+            }
+            keywords.push(keyword);
+            saveKeywords(keywords);
+            keywordInput.value = '';
+            renderList();
+        };
+        keywordInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addBtn.click();
+            }
+        };
+        inputRow.appendChild(keywordInput);
+        inputRow.appendChild(addBtn);
+
+        const closeCardBtn = document.createElement('button');
+        closeCardBtn.textContent = '关闭';
+        closeCardBtn.style.cssText = 'width:100%;padding:7px;font-size:12px;color:#666;background:#fff;border:1px solid #ddd;border-radius:4px;cursor:pointer;';
+        closeCardBtn.onclick = () => mask.remove();
+
+        footer.appendChild(inputRow);
+        footer.appendChild(closeCardBtn);
+        card.appendChild(header);
+        card.appendChild(listContainer);
+        card.appendChild(footer);
+        mask.appendChild(card);
+        mask.onclick = (e) => {
+            if (e.target === mask) mask.remove();
+        };
+        document.body.appendChild(mask);
+    }
+
     // ==================== 黑名单管理面板 ====================
     function createBlacklistPanel() {
         if (document.getElementById('blacklist-panel')) return;
@@ -863,26 +977,14 @@
         menu.appendChild(sep);
 
         // ===== 关键词屏蔽配置 =====
-        const kwLabel = document.createElement('div');
-        kwLabel.style.cssText = 'font-size:11px;color:#999;padding:2px 0;';
-        kwLabel.textContent = '屏蔽关键词（逗号分隔）';
-        menu.appendChild(kwLabel);
-
-        const kwInput = document.createElement('textarea');
-        kwInput.style.cssText = 'width:200px;height:60px;font-size:11px;padding:4px;border:1px solid #ddd;border-radius:4px;resize:vertical;box-sizing:border-box;';
-        kwInput.value = getKeywords().join(', ');
-        menu.appendChild(kwInput);
-
-        const kwSaveBtn = document.createElement('div');
-        kwSaveBtn.style.cssText = 'padding:4px 12px;font-size:11px;color:#fff;background:#4a90d9;border-radius:4px;cursor:pointer;text-align:center;';
-        kwSaveBtn.textContent = '保存关键词';
-        kwSaveBtn.onclick = (e) => {
+        const keywordViewBtn = document.createElement('div');
+        keywordViewBtn.style.cssText = 'padding:6px 12px;font-size:12px;color:#333;background:#f5f5f5;border-radius:4px;cursor:pointer;text-align:center;';
+        keywordViewBtn.textContent = '查看屏蔽关键词';
+        keywordViewBtn.onclick = (e) => {
             e.stopPropagation();
-            const newKw = kwInput.value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-            saveKeywords(newKw);
-            alert('屏蔽关键词已保存，共 ' + newKw.length + ' 个：' + newKw.join('、'));
+            openKeywordModal();
         };
-        menu.appendChild(kwSaveBtn);
+        menu.appendChild(keywordViewBtn);
 
         // ===== 评论屏蔽配置 =====
         const sep2 = document.createElement('hr');
