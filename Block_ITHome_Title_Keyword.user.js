@@ -2,7 +2,7 @@
 // @name         IT之家 综合优化（关键词屏蔽+免登录显示大图+去红包广告+用户黑名单）
 // @name:en      ITome block keyword + moveout fuck AD + userblacklist
 // @namespace    https://github.com/Hubupup/Block_ITHome_Title_Keyword/
-// @version      4.2
+// @version      4.3
 // @description  屏蔽指定关键词新闻，评论区图片免登录自动显示与大图浏览，关闭底部横幅，隐藏打开APP图标，移除红包iframe，根据通行证ID屏蔽黑名单
 // @description:en Block keyword news, remove banner ads, auto-hide popups, blacklist users by ID, auto-display comment images without login
 // @author       Hubupup
@@ -16,11 +16,12 @@
     // ==================== 默认配置（可通过面板修改，保存在 localStorage） ====================
     const DEFAULT_KEYWORDS = ['鸿蒙', '余承东', '雷军', '问界', '享界', '尊界', '我国'];
     const DEFAULT_MIN_INTERACTION = 4;
-    const DEFAULT_DOWNVOTE_RATIO = 4;
+    const DEFAULT_DOWNVOTE_RATIO = 80;
 
     const STORAGE_KEYWORDS = 'ithome_block_keywords';
     const STORAGE_MIN_INTERACTION = 'ithome_comment_min_interaction';
-    const STORAGE_DOWNVOTE_RATIO = 'ithome_comment_downvote_ratio';
+    const STORAGE_DOWNVOTE_RATIO = 'ithome_comment_downvote_percent';
+    const LEGACY_STORAGE_DOWNVOTE_RATIO = 'ithome_comment_downvote_ratio';
 
     function getKeywords() {
         try {
@@ -41,8 +42,23 @@
 
     function getDownvoteRatio() {
         const v = localStorage.getItem(STORAGE_DOWNVOTE_RATIO);
-        const n = v !== null ? parseFloat(v) : DEFAULT_DOWNVOTE_RATIO;
-        return isNaN(n) ? DEFAULT_DOWNVOTE_RATIO : n;
+        if (v !== null) {
+            const n = parseFloat(v);
+            return isNaN(n) ? DEFAULT_DOWNVOTE_RATIO : n;
+        }
+
+        // 兼容旧版“反对数 ÷ 支持数”阈值，换算为反对数占总互动数的百分比。
+        const legacyValue = localStorage.getItem(LEGACY_STORAGE_DOWNVOTE_RATIO);
+        if (legacyValue !== null) {
+            const legacyRatio = parseFloat(legacyValue);
+            const percent = !isNaN(legacyRatio) && legacyRatio >= 0
+                ? legacyRatio / (1 + legacyRatio) * 100
+                : DEFAULT_DOWNVOTE_RATIO;
+            saveDownvoteRatio(percent);
+            localStorage.removeItem(LEGACY_STORAGE_DOWNVOTE_RATIO);
+            return percent;
+        }
+        return DEFAULT_DOWNVOTE_RATIO;
     }
     function saveDownvoteRatio(val) { localStorage.setItem(STORAGE_DOWNVOTE_RATIO, String(val)); }
 
@@ -323,8 +339,8 @@
     function shouldBlockComment(upvotes, downvotes) {
         const total = upvotes + downvotes;
         if (total < getMinInteraction()) return false;
-        if (upvotes === 0) return downvotes > 0;
-        return (downvotes / upvotes) >= getDownvoteRatio();
+        const downvotePercent = total > 0 ? downvotes / total * 100 : 0;
+        return downvotePercent >= getDownvoteRatio();
     }
 
     function blockComment(commentItem) {
@@ -355,8 +371,8 @@
 
         commentItem.dataset.upvotes = upvotes;
         commentItem.dataset.downvotes = downvotes;
-        const ratio = upvotes > 0 ? (downvotes / upvotes).toFixed(2) : '∞';
-        commentItem.dataset.ratio = ratio;
+        const ratio = upvotes + downvotes > 0 ? (downvotes / (upvotes + downvotes) * 100).toFixed(1) : '0';
+        commentItem.dataset.ratio = `${ratio}%`;
 
         if (shouldBlockComment(upvotes, downvotes)) {
             blockComment(commentItem);
@@ -992,15 +1008,27 @@
         menu.appendChild(sep2);
 
         const voteLabel = document.createElement('div');
-        voteLabel.style.cssText = 'font-size:11px;color:#999;padding:2px 0;';
-        voteLabel.textContent = '评论屏蔽配置';
+        voteLabel.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11px;color:#999;padding:2px 0;';
+        const voteLabelText = document.createElement('span');
+        voteLabelText.textContent = '评论屏蔽配置';
+        const voteHelpBtn = document.createElement('button');
+        voteHelpBtn.type = 'button';
+        voteHelpBtn.textContent = '?';
+        voteHelpBtn.title = '查看指标说明';
+        voteHelpBtn.style.cssText = 'width:16px;height:16px;padding:0;border:1px solid #aaa;border-radius:50%;background:#fff;color:#777;font-size:11px;line-height:14px;text-align:center;cursor:pointer;';
+        voteHelpBtn.onclick = (e) => {
+            e.stopPropagation();
+            alert('只有当互动数和反对比例同时符合才会屏蔽\n互动数：赞成和反对的总数\n反对比例：反对数 ÷ 互动数 × 100%');
+        };
+        voteLabel.appendChild(voteLabelText);
+        voteLabel.appendChild(voteHelpBtn);
         menu.appendChild(voteLabel);
 
         // 最小互动数
         const minRow = document.createElement('div');
         minRow.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px;color:#333;padding:2px 0;';
         const minLabel = document.createElement('span');
-        minLabel.textContent = '最小互动数:';
+        minLabel.textContent = '互动数≥';
         const minInput = document.createElement('input');
         minInput.type = 'number';
         minInput.min = '1';
@@ -1014,34 +1042,42 @@
         const ratioRow = document.createElement('div');
         ratioRow.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px;color:#333;padding:2px 0;';
         const ratioLabel = document.createElement('span');
-        ratioLabel.textContent = '反对/支持≥';
+        ratioLabel.textContent = '反对比例≥';
         const ratioInput = document.createElement('input');
         ratioInput.type = 'number';
-        ratioInput.min = '1';
+        ratioInput.min = '0';
+        ratioInput.max = '100';
         ratioInput.step = '0.5';
         ratioInput.style.cssText = 'width:50px;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:3px;';
         ratioInput.value = getDownvoteRatio();
         const ratioHint = document.createElement('span');
-        ratioHint.textContent = '时屏蔽';
+        ratioHint.textContent = '% 时屏蔽';
         ratioRow.appendChild(ratioLabel);
         ratioRow.appendChild(ratioInput);
         ratioRow.appendChild(ratioHint);
         menu.appendChild(ratioRow);
 
-        const voteSaveBtn = document.createElement('div');
-        voteSaveBtn.style.cssText = 'padding:4px 12px;font-size:11px;color:#fff;background:#4a90d9;border-radius:4px;cursor:pointer;text-align:center;margin-top:2px;';
-        voteSaveBtn.textContent = '保存评论配置';
-        voteSaveBtn.onclick = (e) => {
-            e.stopPropagation();
+        const autoSaveHint = document.createElement('div');
+        autoSaveHint.style.cssText = 'font-size:10px;color:#999;padding:1px 0;';
+        autoSaveHint.textContent = '修改后自动保存';
+        menu.appendChild(autoSaveHint);
+
+        minInput.addEventListener('input', () => {
             const minVal = parseInt(minInput.value, 10);
+            if (!isNaN(minVal) && minVal >= 1) saveMinInteraction(minVal);
+        });
+        minInput.addEventListener('change', () => {
+            const minVal = parseInt(minInput.value, 10);
+            if (isNaN(minVal) || minVal < 1) minInput.value = getMinInteraction();
+        });
+        ratioInput.addEventListener('input', () => {
             const ratioVal = parseFloat(ratioInput.value);
-            if (isNaN(minVal) || minVal < 1) { alert('最小互动数必须 ≥ 1'); return; }
-            if (isNaN(ratioVal) || ratioVal < 1) { alert('反对比例阈值必须 ≥ 1'); return; }
-            saveMinInteraction(minVal);
-            saveDownvoteRatio(ratioVal);
-            alert(`评论屏蔽配置已保存：\n最小互动数 = ${minVal}\n反对/支持比例 ≥ ${ratioVal}`);
-        };
-        menu.appendChild(voteSaveBtn);
+            if (!isNaN(ratioVal) && ratioVal >= 0 && ratioVal <= 100) saveDownvoteRatio(ratioVal);
+        });
+        ratioInput.addEventListener('change', () => {
+            const ratioVal = parseFloat(ratioInput.value);
+            if (isNaN(ratioVal) || ratioVal < 0 || ratioVal > 100) ratioInput.value = getDownvoteRatio();
+        });
 
         let menuOpen = false;
         mgrBtn.onclick = () => {
